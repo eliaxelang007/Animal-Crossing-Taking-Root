@@ -1,21 +1,37 @@
-use leptos::{ev, prelude::*};
-use web_sys::{js_sys::Date, HtmlAudioElement};
-use wasm_bindgen_futures::{JsFuture, spawn_local};
-use leptos::logging::log;
+use leptos::{
+    prelude::*,
+    ev,
+    logging::log
+};
+
+
 use leptos_router::{components::{Route, Router, Routes}, path};
 use leptos_use::use_event_listener;
 
-fn set_to_ten(date: Date) -> Date {
-    Date::new_with_year_month_day_hr_min_sec_milli(
-        date.get_full_year(), 
-        date.get_month() as i32,
-        date.get_date() as i32,
-        10,
-        date.get_minutes() as i32,
-        date.get_seconds() as i32,
-        date.get_milliseconds() as i32
-    )
-}
+use wasm_bindgen_futures::{JsFuture, spawn_local};
+use web_sys::{js_sys::Date, HtmlAudioElement};
+
+use std::{ops::Deref, sync::{Arc, Mutex}};
+use std::rc::Rc;
+use std::cell::RefCell;
+
+// fn set_to_ten(date: Date) -> Date {
+//     Date::new_with_year_month_day_hr_min_sec_milli(
+//         date.get_full_year(), 
+//         date.get_month() as i32,
+//         date.get_date() as i32,
+//         10,
+//         date.get_minutes() as i32,
+//         date.get_seconds() as i32,
+//         date.get_milliseconds() as i32
+//     )
+// }
+
+#[derive(Clone)]
+struct HtmlAudioElementWrapper(HtmlAudioElement);
+
+unsafe impl Send for HtmlAudioElementWrapper {}
+unsafe impl Sync for HtmlAudioElementWrapper {}
 
 fn f64_eq_epsilon(a: f64, b: f64, epsilon: f64) -> bool {
     (a - b).abs() < epsilon
@@ -25,77 +41,93 @@ fn f64_eq_epsilon(a: f64, b: f64, epsilon: f64) -> bool {
 fn Player() -> impl IntoView {
     let audios = (0..24).map(
         |hour| {
-            HtmlAudioElement::
-                new_with_src(&format!("/assets/{hour}.oga"))
-                .expect("Couldn't create an `audio` html element!")
+            Arc::new(
+                Mutex::new(
+                    HtmlAudioElementWrapper(
+                        HtmlAudioElement::
+                            new_with_src(&format!("/assets/{hour}.oga"))
+                            .expect("Couldn't create an `audio` html element!")
+                    )
+                )
+            )
         }
     ).collect::<Vec<_>>();
-    
-    let current_hour = set_to_ten(Date::new_0()).get_hours();
 
-    let audio = (&audios[current_hour as usize]).clone();
-
-    let _ = use_event_listener(
-        audio.clone(), 
-        ev::loadedmetadata, 
-        {
-            let audio = audio.clone();
-
-            move |_| {
-                audio.set_loop(true);
-
-                let audio = audio.clone();
-        
-                spawn_local(async move {
-                    JsFuture::from(audio.play().expect("Couldn't play audio!")).await.expect("Couldn't await play of the audio!");
-                });
-            }
-        }
+    let (song, set_song) = signal::<Arc<Mutex<HtmlAudioElementWrapper>>>(
+        Arc::clone(&audios[Date::new_0().get_hours() as usize])
     );
 
-    let _ = use_event_listener(
-        audio.clone(), 
-        ev::timeupdate, 
-        move |_| {
-            // let audio = audio.clone();
+    Effect::new(
+        move || {
+            let song = {
+                let threadsafe_song = song.get();
+                let song_wrapper = threadsafe_song.lock().expect("Couldn't get the HtmlAudioElement!");
 
-            let audio_duration = audio.duration();
+                song_wrapper.0.clone()
+            };
+
+            let _ = use_event_listener(
+                song.clone(), 
+                ev::loadedmetadata, 
+                {
+                    let song = song.clone();
         
-            let current_time = set_to_ten(Date::new_0());
-            let hour_start = Date::new_with_year_month_day_hr_min_sec_milli(
-                current_time.get_full_year(), 
-                current_time.get_month() as i32,
-                current_time.get_date() as i32,
-                current_time.get_hours() as i32,
-                0,
-                0,
-                0
+                    move |_| {
+                        song.set_loop(true);
+        
+                        let song = song.clone();
+                
+                        spawn_local(async move {
+                            JsFuture::from(song.play().expect("Couldn't play audio!")).await.expect("Couldn't await play of the audio!");
+                        });
+                    }
+                }
             );
         
-            const HOUR_BELLS_DURATION_MILLIS: f64 = 14033.333;
-        
-            let millis_from_hour_start: f64 = current_time.get_time() - hour_start.get_time();
-            let target_time = ((millis_from_hour_start - HOUR_BELLS_DURATION_MILLIS) / 1000.0).rem_euclid(audio_duration);
-        
-            let correction = target_time - audio.current_time();
-            let difference = correction.abs();
-        
-            // log!("Diff: {difference}");
-        
-            if f64_eq_epsilon(difference, 0.05, 0.01) {
-                return;
-            }
-        
-            log!("Resyncing...");
-        
-            let resync_correction = if difference > 0.5 { 0.0 } else { correction };
-            let resync_weight = 1.2;
-        
-            // log!("{resync_correction} * {resync_weight} = {}", resync_correction * resync_weight);
-        
-            audio.set_current_time(target_time + (resync_correction * resync_weight));
+            let _ = use_event_listener(
+                song.clone(), 
+                ev::timeupdate, 
+                move |_| {
+                    let audio_duration = song.duration();
+                
+                    let current_time = Date::new_0();
+                    let hour_start = Date::new_with_year_month_day_hr_min_sec_milli(
+                        current_time.get_full_year(), 
+                        current_time.get_month() as i32,
+                        current_time.get_date() as i32,
+                        current_time.get_hours() as i32,
+                        0,
+                        0,
+                        0
+                    );
+                
+                    const HOUR_BELLS_DURATION_MILLIS: f64 = 14033.333;
+                
+                    let millis_from_hour_start: f64 = current_time.get_time() - hour_start.get_time();
+                    let target_time = ((millis_from_hour_start - HOUR_BELLS_DURATION_MILLIS) / 1000.0).rem_euclid(audio_duration);
+                
+                    let correction = target_time - song.current_time();
+                    let difference = correction.abs();
+                
+                    // log!("Diff: {difference}");
+                
+                    if f64_eq_epsilon(difference, 0.05, 0.01) {
+                        return;
+                    }
+                
+                    log!("Resyncing...");
+                
+                    let resync_correction = if difference > 0.5 { 0.0 } else { correction };
+                    let resync_weight = 1.2;
+                
+                    // log!("{resync_correction} * {resync_weight} = {}", resync_correction * resync_weight);
+                
+                    song.set_current_time(target_time + (resync_correction * resync_weight));
+                }
+            );
         }
     );
+
 
     view! {
         <div>
