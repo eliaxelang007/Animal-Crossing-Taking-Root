@@ -1,9 +1,9 @@
-use leptos::{html::Video, prelude::*};
-use web_sys::js_sys::Date;
+use leptos::{ev, prelude::*};
+use web_sys::{js_sys::Date, HtmlAudioElement};
 use wasm_bindgen_futures::{JsFuture, spawn_local};
-use leptos::html::Audio;
 use leptos::logging::log;
 use leptos_router::{components::{Route, Router, Routes}, path};
+use leptos_use::use_event_listener;
 
 fn set_to_ten(date: Date) -> Date {
     Date::new_with_year_month_day_hr_min_sec_milli(
@@ -23,68 +23,151 @@ fn f64_eq_epsilon(a: f64, b: f64, epsilon: f64) -> bool {
 
 #[component]
 fn Player() -> impl IntoView {
-    let audio_ref: NodeRef<Audio> = NodeRef::new();
-
-    const HOUR_BELLS_DURATION_MILLIS: f64 = 14033.333;
-
+    let audios = (0..24).map(
+        |hour| {
+            HtmlAudioElement::
+                new_with_src(&format!("/assets/{hour}.oga"))
+                .expect("Couldn't create an `audio` html element!")
+        }
+    ).collect::<Vec<_>>();
+    
     let current_hour = set_to_ten(Date::new_0()).get_hours();
 
-    let on_loaded_metadata = move |_| {
-        let audio = audio_ref.get().expect("Couldn't load a song for the current hour.");
+    let audio = (&audios[current_hour as usize]).clone();
 
-        audio.set_loop(true);
-  
-        spawn_local(async move {
-            JsFuture::from(audio.play().expect("Couldn't play audio!")).await.expect("Couldn't await play of the audio!");
-        });
-    };
+    let _ = use_event_listener(
+        audio.clone(), 
+        ev::loadedmetadata, 
+        {
+            let audio = audio.clone();
 
-    let on_time_update = move |_| {
-        let audio = audio_ref.get().expect("Couldn't load a song for the current hour.");
+            move |_| {
+                audio.set_loop(true);
 
-        let audio_duration = audio.duration();
-
-        let current_time = set_to_ten(Date::new_0());
-        let hour_start = Date::new_with_year_month_day_hr_min_sec_milli(
-            current_time.get_full_year(), 
-            current_time.get_month() as i32,
-            current_time.get_date() as i32,
-            current_time.get_hours() as i32,
-            0,
-            0,
-            0
-        );
-
-        let millis_from_hour_start: f64 = current_time.get_time() - hour_start.get_time();
-        let target_time = ((millis_from_hour_start - HOUR_BELLS_DURATION_MILLIS) / 1000.0).rem_euclid(audio_duration);
-
-        let correction = target_time - audio.current_time();
-        let difference = correction.abs();
-
-        log!("Diff: {difference}");
-
-        if f64_eq_epsilon(difference, 0.05, 0.01) {
-            return;
+                let audio = audio.clone();
+        
+                spawn_local(async move {
+                    JsFuture::from(audio.play().expect("Couldn't play audio!")).await.expect("Couldn't await play of the audio!");
+                });
+            }
         }
+    );
 
-        log!("Resyncing...");
+    let _ = use_event_listener(
+        audio.clone(), 
+        ev::timeupdate, 
+        move |_| {
+            // let audio = audio.clone();
 
-        let resync_correction = if difference > 0.5 { 0.0 } else { correction };
-        let resync_weight = 1.0;
-
-        // log!("{resync_correction} * {resync_weight} = {}", resync_correction * resync_weight);
-
-        audio.set_current_time(target_time + (resync_correction * resync_weight));
-    };
-
+            let audio_duration = audio.duration();
+        
+            let current_time = set_to_ten(Date::new_0());
+            let hour_start = Date::new_with_year_month_day_hr_min_sec_milli(
+                current_time.get_full_year(), 
+                current_time.get_month() as i32,
+                current_time.get_date() as i32,
+                current_time.get_hours() as i32,
+                0,
+                0,
+                0
+            );
+        
+            const HOUR_BELLS_DURATION_MILLIS: f64 = 14033.333;
+        
+            let millis_from_hour_start: f64 = current_time.get_time() - hour_start.get_time();
+            let target_time = ((millis_from_hour_start - HOUR_BELLS_DURATION_MILLIS) / 1000.0).rem_euclid(audio_duration);
+        
+            let correction = target_time - audio.current_time();
+            let difference = correction.abs();
+        
+            // log!("Diff: {difference}");
+        
+            if f64_eq_epsilon(difference, 0.05, 0.01) {
+                return;
+            }
+        
+            log!("Resyncing...");
+        
+            let resync_correction = if difference > 0.5 { 0.0 } else { correction };
+            let resync_weight = 1.2;
+        
+            // log!("{resync_correction} * {resync_weight} = {}", resync_correction * resync_weight);
+        
+            audio.set_current_time(target_time + (resync_correction * resync_weight));
+        }
+    );
 
     view! {
-        <audio controls src={format!("/assets/{current_hour}.oga")} preload="metadata" node_ref=audio_ref on:loadeddata=on_loaded_metadata on:timeupdate=on_time_update/>
         <div>
-            "Playing :D"
+            "WHarg! Playing :D"
         </div>
     }
 }
+
+// #[component]
+// fn Player() -> impl IntoView {
+//     let audio_ref: NodeRef<Audio> = NodeRef::new();
+
+//     const HOUR_BELLS_DURATION_MILLIS: f64 = 14033.333;
+
+//     let current_hour = set_to_ten(Date::new_0()).get_hours();
+
+//     let on_loaded_metadata = move |_| {
+//         let audio = audio_ref.get().expect("Couldn't load a song for the current hour.");
+
+//         audio.set_loop(true);
+  
+//         spawn_local(async move {
+//             JsFuture::from(audio.play().expect("Couldn't play audio!")).await.expect("Couldn't await play of the audio!");
+//         });
+//     };
+
+//     let on_time_update = move |_| {
+//         let audio = audio_ref.get().expect("Couldn't load a song for the current hour.");
+
+//         let audio_duration = audio.duration();
+
+//         let current_time = set_to_ten(Date::new_0());
+//         let hour_start = Date::new_with_year_month_day_hr_min_sec_milli(
+//             current_time.get_full_year(), 
+//             current_time.get_month() as i32,
+//             current_time.get_date() as i32,
+//             current_time.get_hours() as i32,
+//             0,
+//             0,
+//             0
+//         );
+
+//         let millis_from_hour_start: f64 = current_time.get_time() - hour_start.get_time();
+//         let target_time = ((millis_from_hour_start - HOUR_BELLS_DURATION_MILLIS) / 1000.0).rem_euclid(audio_duration);
+
+//         let correction = target_time - audio.current_time();
+//         let difference = correction.abs();
+
+//         log!("Diff: {difference}");
+
+//         if f64_eq_epsilon(difference, 0.05, 0.01) {
+//             return;
+//         }
+
+//         log!("Resyncing...");
+
+//         let resync_correction = if difference > 0.5 { 0.0 } else { correction };
+//         let resync_weight = 1.0;
+
+//         // log!("{resync_correction} * {resync_weight} = {}", resync_correction * resync_weight);
+
+//         audio.set_current_time(target_time + (resync_correction * resync_weight));
+//     };
+
+
+//     view! {
+//         <audio controls src={format!("/assets/{current_hour}.oga")} preload="metadata" node_ref=audio_ref on:loadeddata=on_loaded_metadata on:timeupdate=on_time_update/>
+//         <div>
+//             "Playing :D"
+//         </div>
+//     }
+// }
 
 // #[component]
 // fn VideoPlayer() -> impl IntoView {
