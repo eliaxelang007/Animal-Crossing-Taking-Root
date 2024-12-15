@@ -1,3 +1,9 @@
+mod audio;
+mod time;
+
+use audio::AudioContext;
+use time::Clock;
+
 use leptos::{
     prelude::*,
     ev,
@@ -12,8 +18,6 @@ use web_sys::{js_sys::Date, HtmlAudioElement};
 
 use std::sync::{Arc, Mutex};
 use std::ops::Sub;
-
-mod audio;
 
 #[derive(Clone)]
 struct HtmlAudioElementWrapper(HtmlAudioElement);
@@ -39,16 +43,6 @@ impl FloatEpsilonEq for f64 {}
 
 #[component]
 fn Player() -> impl IntoView {
-    let performance = window().performance().expect("Couldn't get performance!");
-    let clock = Clock::new(performance.clone());
-    
-    let seconds_elapsed_js = Date::new_0().get_time();
-    let seconds_elapsed = clock.since_epoch_ms();
-
-    log!("{}", performance.now());
-
-    log!("{seconds_elapsed} VS {seconds_elapsed_js}");
-
     let audios = (0..24).map(
         |hour| {
             Arc::new(
@@ -143,6 +137,15 @@ fn Player() -> impl IntoView {
             ));
         }
     );
+
+    let performance = window().performance().expect("No performance in window.");
+
+    let clock = Clock::new(performance.clone());
+
+    let current_time = clock.since_epoch_ms();
+    let current_js_time = Date::new_0().get_time();
+
+    log!("{current_time}\n{current_js_time}");
 
 
     view! {
