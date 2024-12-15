@@ -4,28 +4,16 @@ use leptos::{
     logging::log
 };
 
-
 use leptos_router::{components::{Route, Router, Routes}, path};
 use leptos_use::use_event_listener;
 
 use wasm_bindgen_futures::{JsFuture, spawn_local};
 use web_sys::{js_sys::Date, HtmlAudioElement};
 
-use std::{ops::Deref, sync::{Arc, Mutex}};
-use std::rc::Rc;
-use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
+use std::ops::Sub;
 
-// fn set_to_ten(date: Date) -> Date {
-//     Date::new_with_year_month_day_hr_min_sec_milli(
-//         date.get_full_year(), 
-//         date.get_month() as i32,
-//         date.get_date() as i32,
-//         10,
-//         date.get_minutes() as i32,
-//         date.get_seconds() as i32,
-//         date.get_milliseconds() as i32
-//     )
-// }
+mod audio;
 
 #[derive(Clone)]
 struct HtmlAudioElementWrapper(HtmlAudioElement);
@@ -33,12 +21,34 @@ struct HtmlAudioElementWrapper(HtmlAudioElement);
 unsafe impl Send for HtmlAudioElementWrapper {}
 unsafe impl Sync for HtmlAudioElementWrapper {}
 
-fn f64_eq_epsilon(a: f64, b: f64, epsilon: f64) -> bool {
-    (a - b).abs() < epsilon
+trait FloatEpsilonEq where 
+    Self: Sized + PartialOrd,
+    for <'a> &'a Self: Sub<Output = Self> {
+    fn eq_epsilon(&self, other: &Self, epsilon: &Self) -> bool {
+        let (mut greater, mut lesser) = (self, other);
+
+        if lesser > greater {
+            (greater, lesser) = (lesser, greater);
+        }
+
+        (greater - lesser) < *epsilon
+    }
 }
+
+impl FloatEpsilonEq for f64 {}
 
 #[component]
 fn Player() -> impl IntoView {
+    let performance = window().performance().expect("Couldn't get performance!");
+    let clock = Clock::new(performance.clone());
+    
+    let seconds_elapsed_js = Date::new_0().get_time();
+    let seconds_elapsed = clock.since_epoch_ms();
+
+    log!("{}", performance.now());
+
+    log!("{seconds_elapsed} VS {seconds_elapsed_js}");
+
     let audios = (0..24).map(
         |hour| {
             Arc::new(
@@ -57,8 +67,14 @@ fn Player() -> impl IntoView {
         Arc::clone(&audios[Date::new_0().get_hours() as usize])
     );
 
+    let mut remove_on_song_start: Box<dyn Fn() + Send + Sync> = Box::new(|| {});
+    let mut remove_on_song_update: Box<dyn Fn() + Send + Sync> = Box::new(|| {});
+
     Effect::new(
         move || {
+            remove_on_song_start();
+            remove_on_song_update();
+
             let song = {
                 let threadsafe_song = song.get();
                 let song_wrapper = threadsafe_song.lock().expect("Couldn't get the HtmlAudioElement!");
@@ -66,7 +82,7 @@ fn Player() -> impl IntoView {
                 song_wrapper.0.clone()
             };
 
-            let _ = use_event_listener(
+            remove_on_song_start = Box::new(use_event_listener(
                 song.clone(), 
                 ev::loadedmetadata, 
                 {
@@ -82,9 +98,9 @@ fn Player() -> impl IntoView {
                         });
                     }
                 }
-            );
+            ));
         
-            let _ = use_event_listener(
+            remove_on_song_update = Box::new(use_event_listener(
                 song.clone(), 
                 ev::timeupdate, 
                 move |_| {
@@ -111,20 +127,20 @@ fn Player() -> impl IntoView {
                 
                     // log!("Diff: {difference}");
                 
-                    if f64_eq_epsilon(difference, 0.05, 0.01) {
+                    if difference.eq_epsilon(&0.05, &0.01) {
                         return;
                     }
                 
-                    log!("Resyncing...");
+                    // log!("Resyncing...");
                 
                     let resync_correction = if difference > 0.5 { 0.0 } else { correction };
-                    let resync_weight = 1.2;
+                    let resync_weight = 0.5;
                 
                     // log!("{resync_correction} * {resync_weight} = {}", resync_correction * resync_weight);
                 
                     song.set_current_time(target_time + (resync_correction * resync_weight));
                 }
-            );
+            ));
         }
     );
 
@@ -135,132 +151,6 @@ fn Player() -> impl IntoView {
         </div>
     }
 }
-
-// #[component]
-// fn Player() -> impl IntoView {
-//     let audio_ref: NodeRef<Audio> = NodeRef::new();
-
-//     const HOUR_BELLS_DURATION_MILLIS: f64 = 14033.333;
-
-//     let current_hour = set_to_ten(Date::new_0()).get_hours();
-
-//     let on_loaded_metadata = move |_| {
-//         let audio = audio_ref.get().expect("Couldn't load a song for the current hour.");
-
-//         audio.set_loop(true);
-  
-//         spawn_local(async move {
-//             JsFuture::from(audio.play().expect("Couldn't play audio!")).await.expect("Couldn't await play of the audio!");
-//         });
-//     };
-
-//     let on_time_update = move |_| {
-//         let audio = audio_ref.get().expect("Couldn't load a song for the current hour.");
-
-//         let audio_duration = audio.duration();
-
-//         let current_time = set_to_ten(Date::new_0());
-//         let hour_start = Date::new_with_year_month_day_hr_min_sec_milli(
-//             current_time.get_full_year(), 
-//             current_time.get_month() as i32,
-//             current_time.get_date() as i32,
-//             current_time.get_hours() as i32,
-//             0,
-//             0,
-//             0
-//         );
-
-//         let millis_from_hour_start: f64 = current_time.get_time() - hour_start.get_time();
-//         let target_time = ((millis_from_hour_start - HOUR_BELLS_DURATION_MILLIS) / 1000.0).rem_euclid(audio_duration);
-
-//         let correction = target_time - audio.current_time();
-//         let difference = correction.abs();
-
-//         log!("Diff: {difference}");
-
-//         if f64_eq_epsilon(difference, 0.05, 0.01) {
-//             return;
-//         }
-
-//         log!("Resyncing...");
-
-//         let resync_correction = if difference > 0.5 { 0.0 } else { correction };
-//         let resync_weight = 1.0;
-
-//         // log!("{resync_correction} * {resync_weight} = {}", resync_correction * resync_weight);
-
-//         audio.set_current_time(target_time + (resync_correction * resync_weight));
-//     };
-
-
-//     view! {
-//         <audio controls src={format!("/assets/{current_hour}.oga")} preload="metadata" node_ref=audio_ref on:loadeddata=on_loaded_metadata on:timeupdate=on_time_update/>
-//         <div>
-//             "Playing :D"
-//         </div>
-//     }
-// }
-
-// #[component]
-// fn VideoPlayer() -> impl IntoView {
-//     let audio_ref: NodeRef<Audio> = NodeRef::new();
-
-//     // let current_hour = set_to_ten(Date::new_0()).get_hours();
-
-//     let on_loaded_metadata = move |_| {
-//         let audio = audio_ref.get().expect("Couldn't load a song for the current hour.");
-
-//         audio.set_loop(true);
-  
-//         spawn_local(async move {
-//             JsFuture::from(audio.play().expect("Couldn't play audio!")).await.expect("Couldn't await play of the audio!");
-//         });
-//     };
-
-//     let on_time_update = move |_| {
-//         let audio = audio_ref.get().expect("Couldn't load a song for the current hour.");
-
-//         let audio_duration = audio.duration();
-
-//         let current_time = set_to_ten(Date::new_0());
-//         let hour_start = Date::new_with_year_month_day_hr_min_sec_milli(
-//             current_time.get_full_year(), 
-//             current_time.get_month() as i32,
-//             current_time.get_date() as i32,
-//             current_time.get_hours() as i32,
-//             0,
-//             0,
-//             0
-//         );
-
-//         let millis_from_hour_start: f64 = current_time.get_time() - hour_start.get_time();
-//         let target_time = ((millis_from_hour_start) / 1000.0).rem_euclid(audio_duration);
-
-//         let correction = target_time - audio.current_time();
-//         let difference = correction.abs();
-
-//         if f64_eq_epsilon(difference, 0.05, 0.025) {
-//             return;
-//         }
-
-//         log!("Resyncing...");
-
-//         let resync_correction = if difference > 0.5 { 0.0 } else { correction };
-//         let resync_weight = 0.9;
-
-//         log!("{resync_correction} * {resync_weight} = {}", resync_correction * resync_weight);
-
-//         audio.set_current_time(target_time + (resync_correction * resync_weight));
-//     };
-
-
-//     view! {
-//         <audio controls src={format!("/assets/10_am_video.oga")} preload="metadata" node_ref=audio_ref on:loadeddata=on_loaded_metadata on:timeupdate=on_time_update/>
-//         <div>
-//             "Playing Video :D"
-//         </div>
-//     }
-// }
 
 #[component]
 fn RequireInteraction(children: ChildrenFn) -> impl IntoView {
@@ -289,11 +179,6 @@ fn App() -> impl IntoView {
                         <Player/>
                     </RequireInteraction> 
                 }/>
-                // <Route path=path!("/test") view=|| view! {
-                //     <RequireInteraction>
-                //         <VideoPlayer/>
-                //     </RequireInteraction>
-                // }/>
             </Routes>
         </Router>
     }
