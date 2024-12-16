@@ -1,56 +1,44 @@
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{js_sys::ArrayBuffer, wasm_bindgen::JsCast, AudioBuffer, AudioBufferSourceNode, AudioContext as WebAudioContext, Response};
+use web_sys::{
+    js_sys::Promise, 
+    wasm_bindgen::{JsCast, JsValue}, 
+    AudioBufferSourceNode, 
+    AudioContext, 
+    Response
+};
+
 use gloo_net::http::Request;
-// use thiserror::Error as ThisError;
 
-#[derive(Clone)]
-pub struct AudioContext(WebAudioContext);
-
-#[derive(Clone)]
-pub struct Audio(AudioBufferSourceNode);
-
-impl Audio {
-    pub fn start(&self, start_at: f64) {
-        self.0.start_with_when(start_at).expect("Couldn't start at time!");
-    }
+pub trait AudioContextExtension {
+    async fn load_audio(&self, source: &str) -> AudioBufferSourceNode;
 }
 
-impl AudioContext {
-    pub fn new() -> Self {
-        Self(WebAudioContext::new().expect("Couldn't create a JS `AudioContext`!"))
-    }
+impl AudioContextExtension for AudioContext {
+    async fn load_audio(&self, source: &str) -> AudioBufferSourceNode {
+        async fn from_maybe_promise<T: JsCast>(maybe_promise: Result<Promise, JsValue>) -> T {
+            JsFuture::from(
+                maybe_promise.expect("Couldn't extract the promise from [maybe_promise]!")
+            )
+            .await
+            .expect("Promise failed!")
+            .dyn_into::<T>()
+            .expect("[JsCast] failed!")
+        }
 
-    pub async fn load_audio<'a>(&'a self, source: &str) -> Audio {
         let audio_request = Request::get(source)
             .send()
             .await
-            .expect("Failed to fetch from `src`!");
+            .expect("Couldn't fetch the audio from the url [source]!");
 
         let raw_response: Response = audio_request.into();
-        let array_buffer = JsFuture::from(
-            raw_response
-                .array_buffer()
-                .expect("Couldn't get a promise for the `ArrayBuffer`!")
-        )
-        .await
-        .expect("Failed to load data as an `ArrayBuffer`!")
-        .dyn_into::<ArrayBuffer>()
-        .expect("Failed to cast data into an `ArrayBuffer`!");
 
-        let audio_buffer = JsFuture::from(
-            self.0
-                .decode_audio_data(&array_buffer)
-                .expect("Couldn't get a promise for the `AudioBuffer`!")
-        )
-        .await
-        .expect("Couldn't decode data as an `AudioBuffer`!")
-        .dyn_into::<AudioBuffer>()
-        .expect("Couldn't cast data into an `AudioBuffer`!");        
+        let array_buffer = from_maybe_promise(raw_response.array_buffer()).await;
+        let audio_buffer = from_maybe_promise(self.decode_audio_data(&array_buffer)).await;
 
-        let source_node = self.0.create_buffer_source().expect("Couldn't create a buffer source!");
+        let audio_source = self.create_buffer_source().expect("Couldn't create an [AudioBufferSourceNode]!");
 
-        source_node.set_buffer(Some(&audio_buffer));
+        audio_source.set_buffer(Some(&audio_buffer));
 
-        Audio(source_node)
+        audio_source
     }
 }
