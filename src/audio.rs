@@ -42,3 +42,13 @@ impl AudioContextExtension for AudioContext {
         audio_source
     }
 }
+
+pub trait AudioBufferSourceNodeExtension {
+    fn duration_s(&self) -> f64;
+}
+
+impl AudioBufferSourceNodeExtension for AudioBufferSourceNode {
+    fn duration_s(&self) -> f64 {
+        self.buffer().expect("Bufferless audio source node!").duration()
+    }
+}

@@ -15,6 +15,7 @@ dependencies = [
 name = "animal_crossing_taking_root"
 version = "0.1.0"
 dependencies = [
+ "futures",
  "gloo-net",
  "leptos",
  "leptos-use",

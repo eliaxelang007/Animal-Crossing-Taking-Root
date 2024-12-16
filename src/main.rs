@@ -187,14 +187,89 @@
 // }
 
 // TODO: If this ends up being a one page app, remove the dependency on Leptos Router
-use leptos::prelude::*;
+use leptos::{prelude::*, logging::log};
 use leptos_router::{components::{Router, Routes, Route}, path};
+
+use web_sys::{wasm_bindgen::JsCast, AudioContext, AudioNode};
+
+use std::rc::Rc;
+mod audio;
+use audio::{AudioContextExtension, AudioBufferSourceNodeExtension};
+
+mod time;
+use time::Clock;
 
 #[component]
 fn Player() -> impl IntoView {
+    let performance = window().performance().expect("Couldn't find [window.performance]!");
+    
+    let clock = Clock::new(performance);
+    // let start_time = clock.since_epoch_ms();
+    
+    let audio_context = AudioContext::new().expect("Couldn't create an [AudioContext]!");
+    let audio_destination = audio_context
+        .destination()
+        .dyn_into::<AudioNode>()
+        .expect("Failed to cast the [AudioDestinationNode] into an [AudioNode]!");
+
+    let song_fetcher = |source: Rc<dyn Fn() -> String>| {
+        let audio_context = audio_context.clone();
+        
+        move || {
+            let audio_context = audio_context.clone();
+            let source = Rc::clone(&source);
+
+            async move {
+                audio_context.load_audio(&source()).await
+            }
+        }
+    };
+
+    let hour_bells = LocalResource::new(
+        song_fetcher(Rc::new(|| "/assets/hour_bells.oga".to_string()))
+    );
+
+    let (current_song, current_song_hour, set_current_song_hour) = {
+        let (current_song_hour, set_current_song_hour) = signal(0u8);
+
+        let current_song = LocalResource::new(
+            song_fetcher(Rc::new(move || format!("/assets/{}.oga", current_song_hour.get())))
+        );
+
+        let set_current_song_hour = move |song_hour: u8| {
+            if let Some(current_song) = current_song.get().as_deref() {
+                current_song.disconnect().expect("Failed to disconnect [current_song]!");
+            }
+    
+            set_current_song_hour.set(song_hour);
+        };
+
+        (current_song, current_song_hour, set_current_song_hour)
+    };
+
+    Effect::new(move || {
+        if let Some(current_song) = current_song.get().as_deref() {
+            current_song
+                .connect_with_audio_node(
+                    &audio_destination
+                )
+                .expect("Failed to connect to connect [AudioBufferSourceNode] to [AudioContext]!");
+
+            const HOUR_BELLS_DURATION_MILLIS: f64 = 14033.333;
+
+            let duration_s = current_song.duration_s();
+            let millis_from_hour_start: f64 = clock.since_epoch_ms() - clock.epoch_to_hour_start_ms();
+            let target_offset = (((millis_from_hour_start - HOUR_BELLS_DURATION_MILLIS) / 1000.0) + 1.0).rem_euclid(duration_s);
+
+            current_song.set_loop(true);
+            current_song.start_with_when_and_grain_offset(0, target_offset).expect("Failed to start audio!");
+        }
+    });
+
+
     view! {
         <div>
-            <h1>"Not playing yet..."</h1>
+        
         </div>
     }
 }
