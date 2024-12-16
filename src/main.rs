@@ -43,6 +43,29 @@ impl FloatEpsilonEq for f64 {}
 
 #[component]
 fn Player() -> impl IntoView {
+    // let performance = window().performance().expect("No performance in window.");
+
+    // let clock = Clock::new(performance.clone());
+
+    // let current_time = clock.since_epoch_ms();
+    // let current_js_time = Date::new_0().get_time();
+
+    // log!("{current_time}\n{current_js_time}");
+
+    // let audios = (0)
+
+    let audio_context = AudioContext::new();
+
+    spawn_local(
+        move || {
+
+        }
+    );
+    let audio = audio_context.load_audio("SKI");
+
+    let a = signal(audio);
+
+
     let audios = (0..24).map(
         |hour| {
             Arc::new(
@@ -137,15 +160,6 @@ fn Player() -> impl IntoView {
             ));
         }
     );
-
-    let performance = window().performance().expect("No performance in window.");
-
-    let clock = Clock::new(performance.clone());
-
-    let current_time = clock.since_epoch_ms();
-    let current_js_time = Date::new_0().get_time();
-
-    log!("{current_time}\n{current_js_time}");
 
 
     view! {
