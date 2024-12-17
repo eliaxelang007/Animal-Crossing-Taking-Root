@@ -190,6 +190,7 @@
 use leptos::{prelude::*, logging::log};
 use leptos_router::{components::{Router, Routes, Route}, path};
 
+use old::VideoPlayer;
 use web_sys::{wasm_bindgen::JsCast, AudioContext, AudioNode};
 
 use std::rc::Rc;
@@ -197,6 +198,7 @@ mod audio;
 use audio::{AudioContextExtension, AudioBufferSourceNodeExtension};
 
 mod time;
+mod old;
 use time::Clock;
 
 #[component]
@@ -230,7 +232,7 @@ fn Player() -> impl IntoView {
     );
 
     let (current_song, current_song_hour, set_current_song_hour) = {
-        let (current_song_hour, set_current_song_hour) = signal(0u8);
+        let (current_song_hour, set_current_song_hour) = signal(10u8);
 
         let current_song = LocalResource::new(
             song_fetcher(Rc::new(move || format!("/assets/{}.oga", current_song_hour.get())))
@@ -247,25 +249,46 @@ fn Player() -> impl IntoView {
         (current_song, current_song_hour, set_current_song_hour)
     };
 
+    Effect::new({
+        let clock = clock.clone();
+        let audio_destination = audio_destination.clone();
+
+        move || {
+            if let Some(current_song) = current_song.get().as_deref() {
+                current_song
+                    .connect_with_audio_node(
+                        &audio_destination
+                    )
+                    .expect("Failed to connect to connect [AudioBufferSourceNode] to [AudioContext]!");
+
+                const HOUR_BELLS_DURATION_MILLIS: f64 = 14033.333;
+
+                current_song.set_loop(true);
+
+                let duration_s = current_song.duration_s();
+                let millis_from_hour_start: f64 = clock.since_hour_start_ms();
+                let target_offset = ((millis_from_hour_start - HOUR_BELLS_DURATION_MILLIS) / 1000.0).rem_euclid(duration_s);
+
+                current_song.start_with_when_and_grain_offset(0.0, target_offset).expect("Failed to start audio!");
+            }
+        }
+    });
+
     Effect::new(move || {
-        if let Some(current_song) = current_song.get().as_deref() {
-            current_song
+        if let Some(hour_bells) = hour_bells.get().as_deref() {
+            hour_bells
                 .connect_with_audio_node(
                     &audio_destination
                 )
                 .expect("Failed to connect to connect [AudioBufferSourceNode] to [AudioContext]!");
 
-            const HOUR_BELLS_DURATION_MILLIS: f64 = 14033.333;
+            let secs_to_next_hour: f64 = clock.to_next_hour_ms() / 1000.0;
 
-            let duration_s = current_song.duration_s();
-            let millis_from_hour_start: f64 = clock.since_epoch_ms() - clock.epoch_to_hour_start_ms();
-            let target_offset = (((millis_from_hour_start - HOUR_BELLS_DURATION_MILLIS) / 1000.0) + 1.0).rem_euclid(duration_s);
+            log!("{}", secs_to_next_hour / 60.0);
 
-            current_song.set_loop(true);
-            current_song.start_with_when_and_grain_offset(0, target_offset).expect("Failed to start audio!");
+            hour_bells.start_with_when(secs_to_next_hour).expect("Failed to start audio!");
         }
     });
-
 
     view! {
         <div>
@@ -300,6 +323,11 @@ fn App() -> impl IntoView {
                 <Route path=path!("/") view=|| view! { 
                     <RequireInteraction>
                         <Player/>
+                    </RequireInteraction> 
+                }/>
+                <Route path=path!("/test") view=|| view! {
+                    <RequireInteraction>
+                        <VideoPlayer/>
                     </RequireInteraction> 
                 }/>
             </Routes>
