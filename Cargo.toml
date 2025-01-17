@@ -6,9 +6,11 @@ edition = "2021"
 [dependencies]
 futures = "0.3.31"
 gloo-net = "0.6.0"
+gloo-timers = { version = "0.3.0", features = ["futures"] }
 leptos = { version = "0.7.0", features = ["csr"] }
 leptos-use = "0.14.0"
 leptos_router = "0.7.0"
+strum = { version = "0.26.3", features = ["derive"] }
 wasm-bindgen-futures = "0.4.49"
 web-sys = {version = "0.3.76", features=["Performance", "AudioContext", "AudioBuffer", "AudioBufferSourceNode", "AudioDestinationNode"] } # "HtmlMediaElement", 
 

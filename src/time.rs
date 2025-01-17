@@ -1,38 +1,7 @@
+use std::ops::Sub;
+
 use web_sys::{js_sys::Date, wasm_bindgen::JsValue, Performance};
-
-pub trait DateExtension {
-    fn copy_with(&self,
-        year: Option<u32>,
-        month: Option<i32>,
-        day: Option<i32>,
-        hr: Option<i32>,
-        min: Option<i32>,
-        sec: Option<i32>,
-        milli: Option<i32>) -> Date;
-}
-
-impl DateExtension for Date {
-    fn copy_with(
-        &self,
-        year: Option<u32>,
-        month: Option<i32>,
-        day: Option<i32>,
-        hr: Option<i32>,
-        min: Option<i32>,
-        sec: Option<i32>,
-        milli: Option<i32>
-    ) -> Date {
-        Date::new_with_year_month_day_hr_min_sec_milli(
-            year.unwrap_or(self.get_full_year()), 
-            month.unwrap_or(self.get_month() as i32), 
-            day.unwrap_or(self.get_date() as i32), 
-            hr.unwrap_or(self.get_hours() as i32), 
-            min.unwrap_or(self.get_minutes() as i32), 
-            sec.unwrap_or(self.get_seconds() as i32), 
-            milli.unwrap_or(self.get_milliseconds() as i32)
-        )
-    }
-}
+use strum::{VariantArray, FromRepr};
 
 #[derive(Clone)]
 pub struct Clock {
@@ -50,45 +19,158 @@ impl Clock {
         }
     }
 
-    fn epoch_to_hour_start_ms(&self) -> f64 {
-        Date::new(
-            &JsValue::from_f64(self.since_epoch_ms())
-        ).copy_with(
-            None, 
-            None, 
-            None, 
-            None, 
-            Some(0), 
-            Some(0), 
-            Some(0)
-        ).get_time()
+    pub fn since_epoch(&self) -> TimeSpan {
+        TimeSpan {
+            millis: self.date_creation_time_ms + (
+                self.clock.now() - self.performance_creation_time_ms
+            )
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
+pub struct TimeSpan {
+    millis: f64
+}
+
+impl Sub for TimeSpan {
+    type Output = TimeSpan;
+
+    fn sub(mut self, other: Self) -> Self::Output {
+        self.millis -= other.millis;
+        self
+    }
+}
+
+impl TimeSpan {
+    pub const fn from_secs_f64(secs: f64) -> Self {
+        TimeSpan {
+            millis: secs * 1000.0
+        }
     }
 
-    fn epoch_to_next_hour(&self) -> f64 {
-        const HOUR_MILLISECONDS: f64 = 3600000.0;
-        self.epoch_to_hour_start_ms() + HOUR_MILLISECONDS
+    pub const fn from_millis_f64(millis: f64) -> Self {
+        TimeSpan {
+            millis
+        }
     }
 
-    fn since_epoch_ms(&self) -> f64 {
-        let real_time_ms = self.date_creation_time_ms + (
-            self.clock.now() - self.performance_creation_time_ms
-        );
+    fn last_as_date(&self, unit: TimeUnit) -> Date {
+        let mut as_date = self.as_date();
 
-        fn min_to_millis(mins: f64) -> f64 {
-            mins * 60000.0
+        if let Some(truncation_unit) =  
+            TimeUnit::from_repr((unit as u8) + 1) {
+            as_date.right_truncate(truncation_unit);
         }
 
-        // TODO: Remove this later on!
-        let offset = min_to_millis(58.0) - min_to_millis(23.0);
-
-        real_time_ms + offset
+        as_date
     }
 
-    pub fn since_hour_start_ms(&self) -> f64 {
-        self.since_epoch_ms() - self.epoch_to_hour_start_ms()
+    pub fn last(&self, unit: TimeUnit) -> TimeSpan {
+        TimeSpan{
+            millis: self.last_as_date(unit).get_time()
+        }
     }
 
-    pub fn to_next_hour_ms(&self) -> f64 {
-        self.epoch_to_next_hour() - self.since_epoch_ms()
+    pub fn next(&self, unit: TimeUnit) -> TimeSpan {
+        let mut last = self.last_as_date(unit);
+        let next_value = last.get(unit) + 1;
+
+        TimeSpan {
+            millis: last
+                .set(next_value, unit)
+                .get_time()
+        }
     }
+
+    pub fn since_last(&self, unit: TimeUnit) -> TimeSpan {
+        *self - self.last(unit)
+    }
+
+    pub fn to_next(&self, unit: TimeUnit) -> TimeSpan {
+        self.next(unit) - *self
+    }
+
+    pub fn as_secs_f64(&self) -> f64 {
+        self.as_millis_f64() / 1000.0
+    }
+
+    pub fn as_millis_f64(&self) -> f64 {
+        self.millis
+    }
+
+    pub fn as_date(&self) -> Date {
+        Date::from_millis(self.millis)
+    }
+}
+
+impl DateExtension for Date {
+    fn from_millis(millis: f64) -> Self {
+        Date::new(&JsValue::from_f64(millis))
+    }
+
+    fn set(&mut self, time: u32, unit: TimeUnit) -> &mut Self {
+        use TimeUnit as T;
+
+        match unit {
+            T::Year => self.set_full_year(time),
+            T::Month => self.set_month(time),
+            T::Day => self.set_date(time),
+            T::Hour => self.set_hours(time),
+            T::Minute => self.set_minutes(time),
+            T::Second => self.set_seconds(time),
+            T::Millisecond => self.set_milliseconds(time)
+        };
+
+        self
+    }
+
+    fn get(&self, unit: TimeUnit) -> u32 {
+        use TimeUnit as T;
+
+        match unit {
+            T::Year => self.get_full_year(),
+            T::Month => self.get_month(),
+            T::Day => self.get_date(),
+            T::Hour => self.get_hours(),
+            T::Minute => self.get_minutes(),
+            T::Second => self.get_seconds(),
+            T::Millisecond => self.get_milliseconds()
+        }
+    }
+
+    fn truncate(&mut self, unit: TimeUnit) -> &mut Self {
+        self.set(
+            if let TimeUnit::Day = unit { 1 } else { 0 },
+            unit
+        )
+    }
+
+    fn right_truncate(&mut self, unit: TimeUnit) -> &mut Self {
+        for &unit in &TimeUnit::VARIANTS[(unit as usize)..] {
+            self.truncate(unit);
+        }
+
+        self
+    }
+}
+
+#[derive(VariantArray, FromRepr, Clone, Copy)]
+#[repr(u8)]
+pub enum TimeUnit {
+    Year,
+    Month,
+    Day,
+    Hour,
+    Minute,
+    Second,
+    Millisecond
+} 
+
+trait DateExtension {
+    fn from_millis(millis: f64) -> Self;
+    fn set(&mut self, time: u32, unit: TimeUnit) -> &mut Self;
+    fn get(&self, unit: TimeUnit) -> u32;
+    fn truncate(&mut self, unit: TimeUnit) -> &mut Self;
+    fn right_truncate(&mut self, unit: TimeUnit) -> &mut Self;
 }

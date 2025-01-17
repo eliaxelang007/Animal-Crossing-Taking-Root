@@ -17,23 +17,23 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::ops::Sub;
 
-use crate::time::Clock;
+use crate::time::{Clock, TimeUnit};
 
-trait FloatEpsilonEq where 
-    Self: Sized + PartialOrd,
-    for <'a> &'a Self: Sub<Output = Self> {
-    fn eq_epsilon(&self, other: &Self, epsilon: &Self) -> bool {
-        let (mut greater, mut lesser) = (self, other);
+// trait FloatEpsilonEq where 
+//     Self: Sized + PartialOrd,
+//     for <'a> &'a Self: Sub<Output = Self> {
+//     fn eq_epsilon(&self, other: &Self, epsilon: &Self) -> bool {
+//         let (mut greater, mut lesser) = (self, other);
 
-        if lesser > greater {
-            (greater, lesser) = (lesser, greater);
-        }
+//         if lesser > greater {
+//             (greater, lesser) = (lesser, greater);
+//         }
 
-        (greater - lesser) < *epsilon
-    }
-}
+//         (greater - lesser) < *epsilon
+//     }
+// }
 
-impl FloatEpsilonEq for f64 {}
+// impl FloatEpsilonEq for f64 {}
 
 #[component]
 pub fn VideoPlayer() -> impl IntoView {
@@ -55,28 +55,23 @@ pub fn VideoPlayer() -> impl IntoView {
     let on_time_update = move |_| {
         let audio = audio_ref.get().expect("Couldn't load a song for the current hour.");
 
-        let audio_duration = audio.duration();
+        let duration_s = audio.duration();
 
-        let millis_from_hour_start: f64 = clock.since_hour_start_ms();
-        let target_time = ((millis_from_hour_start) / 1000.0).rem_euclid(audio_duration);
+        let since_hour = clock.since_epoch().since_last(TimeUnit::Hour);
+        let target_time = since_hour.as_secs_f64().rem_euclid(duration_s);
 
         let correction = target_time - audio.current_time();
         let difference = correction.abs();
 
-        log!("{}", difference);
-
-        if difference.eq_epsilon(&0.05,& 0.025) {
+        if difference <= 0.05 {
             return;
         }
 
-        log!("Resyncing...");
+        let correction_weight = 0.2;
+        
+        log!("ASSSSS {}", correction);
 
-        let resync_correction = if difference > 0.5 { 0.0 } else { correction };
-        let resync_weight = 1.2;
-
-        log!("{resync_correction} * {resync_weight} = {}", resync_correction * resync_weight);
-
-        audio.set_current_time(target_time + (resync_correction * resync_weight));
+        audio.set_current_time(target_time + (correction * correction_weight));
     };
 
 
