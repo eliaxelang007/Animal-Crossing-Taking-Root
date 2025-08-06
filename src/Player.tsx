@@ -1,6 +1,5 @@
-import { createResource, onMount, type Component } from 'solid-js';
+import { onMount, type Component } from 'solid-js';
 
-import logo from './logo.svg';
 import { Milliseconds } from './clock';
 import { Seconds, Play, Repeat, RhythmContext, CompiledPlay } from 'rhythm.js';
 
@@ -13,9 +12,11 @@ const Player: Component = () => {
 
     const hour_bells = await rhythm.compile(new Play("/src/assets/audios/hour_bells.oga"));
 
-    const repeating = await rhythm.compile(new Repeat(
+    const repeating = await rhythm.compile_attached(new Repeat(
+      {
+        duration: 60 as Seconds
+      },
       hour_bells,
-      60 as Seconds
     ));
 
     repeating.schedule_play(0 as Seconds);
@@ -25,8 +26,7 @@ const Player: Component = () => {
 
   return (
     <div >
-      <header >
-        <img src={logo} alt="logo" />
+      <header>
         <p>
           Edit <code>src/App.tsx</code> and save to reload.
         </p>

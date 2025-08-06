@@ -2,7 +2,6 @@
 import { render } from 'solid-js/web';
 import { Router, Route } from "@solidjs/router";
 
-import './index.css';
 import Player from './Player';
 import RequireInteraction from './RequireInteraction';
 

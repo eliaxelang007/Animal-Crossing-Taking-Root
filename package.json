@@ -13,12 +13,11 @@
   "devDependencies": {
     "typescript": "^5.7.2",
     "vite": "^6.0.0",
-    "vite-plugin-solid": "^2.11.0"
+    "vite-plugin-solid": "^2.11.6"
   },
   "dependencies": {
     "@solidjs/router": "^0.15.3",
-    "babel-preset-solid": "^1.9.3",
-    "rhythm.js": "^0.0.7",
-    "solid-js": "^1.9.4"
+    "rhythm.js": "^1.1.5",
+    "solid-js": "^1.9.5"
   }
 }
