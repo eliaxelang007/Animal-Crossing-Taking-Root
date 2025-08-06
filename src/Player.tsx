@@ -1,9 +1,10 @@
-import { onMount, type Component } from 'solid-js';
+import { createSignal, onMount, type Component } from 'solid-js';
 
 import { Milliseconds } from './clock';
 import { Seconds, Play, Repeat, RhythmContext, CompiledPlay } from 'rhythm.js';
 
 const Player: Component = () => {
+  const [background, set_background] = createSignal("backgrounds/15.png");
 
   onMount(async () => {
     const delay = (wait: Milliseconds) => new Promise((resolve) => setTimeout(resolve, wait));
@@ -25,21 +26,9 @@ const Player: Component = () => {
   });
 
   return (
-    <div >
-      <header>
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
+    <img class="fill-parent img-cover" src={background()}>
 
-          href="https://github.com/solidjs/solid"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn Solid
-        </a>
-      </header>
-    </div>
+    </img>
   );
 };
 
