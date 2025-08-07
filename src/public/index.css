@@ -3,7 +3,8 @@
     font-family: "Rubik Mono One", sans-serif;
     text-align: center;
     color: white;
-    cursor: default;
+    pointer-events: none;
+    text-shadow: 2px 2px 2px rgba(0, 0, 0, 0.25);
 }
 
 /* Layout */
@@ -14,6 +15,10 @@
 
 .img-cover {
     object-fit: cover;
+}
+
+.img-contain {
+    object-fit: contain;
 }
 
 .stack {
@@ -43,18 +48,32 @@
 .center-card {
     aspect-ratio: 16/9;
     width: 1920px;
+    border-radius: 2rem;
     max-width: min(90%, 40rem);
     max-height: min(90%);
+    cursor: pointer;
+}
+
+.center-card>img {
     border-radius: 2rem;
 }
 
-.center-card>h1 {
+h1 {
     font-size: 2rem;
+}
+
+h1,
+h2 {
     margin: 1rem;
 }
 
 .black-background {
     background-color: black;
+}
+
+.click {
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 .fader {

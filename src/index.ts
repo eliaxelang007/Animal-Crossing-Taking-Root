@@ -5,6 +5,7 @@ import { gsap } from "gsap";
 const require_interaction = document.getElementById("require-interaction")! as HTMLDivElement;
 const blurred_background = document.getElementById("blurred-background")! as HTMLImageElement;
 const center_card = document.getElementById("center-card")! as HTMLImageElement;
+const fader = document.getElementById("fader")! as HTMLDivElement;
 
 const delay = (wait: Milliseconds) => new Promise((resolve) => setTimeout(resolve, wait));
 
@@ -18,77 +19,119 @@ const rhythm = new RhythmContext(context);
 const FADE_OUT_DURATION = 20 as Seconds;
 
 const hour_bells = await rhythm.compile(new Play("audios/hour_bells.oga"));
-const hour_song_builders = Array
-    .from({ length: 24 }, (_, hour) => hour)
-    .map(
-        (hour) => {
-            const build_track = async () => {
-                const hour_song = await rhythm.compile(
-                    new Gain(
-                        {
-                            gain_keyframes: [
-                                {
-                                    transition: undefined,
-                                    value: 1,
-                                    from_start: (HOUR_SECONDS - FADE_OUT_DURATION) as Seconds
-                                },
-                                {
-                                    transition: "exponential",
-                                    value: 0.01, // Can't exponentially fade out to a flat 0.
-                                    from_start: HOUR_SECONDS
-                                }
-                            ]
-                        },
-                        new Sequence(
-                            [
-                                hour_bells,
-                                new Repeat(
+
+const daily_hours = Array.from({ length: 24 }, (_, hour) => hour);
+
+const hour_song_builders =
+    daily_hours
+        .map(
+            (hour) => {
+                const build_track = async () => {
+                    const hour_song = await rhythm.compile(
+                        new Gain(
+                            {
+                                gain_keyframes: [
                                     {
-                                        duration: (HOUR_SECONDS - hour_bells.duration) as Seconds
+                                        transition: undefined,
+                                        value: 1,
+                                        from_start: (HOUR_SECONDS - FADE_OUT_DURATION) as Seconds
                                     },
-                                    new Play(`audios/${hour}.oga`)
-                                )
-                            ]
+                                    {
+                                        transition: "exponential",
+                                        value: 0.01, // Can't exponentially fade out to a flat 0.
+                                        from_start: HOUR_SECONDS
+                                    }
+                                ]
+                            },
+                            new Sequence(
+                                [
+                                    hour_bells,
+                                    new Repeat(
+                                        {
+                                            duration: (HOUR_SECONDS - hour_bells.duration) as Seconds
+                                        },
+                                        new Play(`audios/${hour}.oga`)
+                                    )
+                                ]
+                            )
                         )
-                    )
+                    );
+
+                    return hour_song.attach_to(fade_in);
+                };
+
+                let track_builder: Promise<Attached<GainNode, AnyCompiledCommand>> | null = null;
+
+                return () => {
+                    if (track_builder === null) {
+                        track_builder = build_track();
+                    }
+
+                    return track_builder;
+                };
+            }
+        );
+
+const backgrounds_loaders =
+    daily_hours
+        .map(
+            (hour) => {
+                const load_background = () => new Promise<string>(
+                    (resolve, reject) => {
+                        const background_path = `backgrounds/${hour}.png`;
+
+                        const loader = new Image();
+                        loader.onload = () => { console.log(`"${background_path}" loaded!`); resolve(background_path); };
+                        loader.onerror = reject;
+                        loader.src = background_path;
+                    }
                 );
 
-                return hour_song.attach_to(fade_in);
-            };
+                let background_loader: Promise<string> | null = null;
 
-            let track_builder: Promise<Attached<GainNode, AnyCompiledCommand>> | null = null;
+                return () => {
+                    if (background_loader === null) {
+                        background_loader = load_background();
+                    }
 
-            return () => {
-                if (track_builder === null) {
-                    track_builder = build_track();
-                }
+                    return background_loader;
+                };
+            }
+        );
 
-                return track_builder;
-            };
-        }
-    );
-
-const set_background = (hour: number) => {
-    const src = `backgrounds/${hour}.png`;
-    blurred_background.src = src;
-    center_card.src = src;
+const set_background = (background_path: string) => {
+    blurred_background.src = background_path;
+    center_card.src = background_path;
 };
 
 const current_hour = clock.current_hour();
 
-set_background(current_hour);
-(async () => { await hour_song_builders[current_hour](); })();
+(async () => {
+    set_background(await backgrounds_loaders[current_hour]());
+    await hour_song_builders[current_hour]();
+})();
 
 require_interaction.onclick = () => {
-    require_interaction.remove();
+    require_interaction.classList.remove("click");
+
+    const FADE_IN_DURATION = 3 as Seconds;
+
+    gsap.to(
+        require_interaction,
+        {
+            opacity: 0,
+            duration: FADE_IN_DURATION,
+            ease: "expo.out",
+            onComplete: () => require_interaction.remove()
+        }
+    );
 
     const play = async () => {
         const current_hour = clock.current_hour();
+        set_background(await backgrounds_loaders[current_hour]());
         const hour_song = await hour_song_builders[current_hour]();
 
         const now = context.currentTime;
-
-        const FADE_IN_DURATION = 3 as Seconds;
 
         fade_in.gain.setValueAtTime(0.01, now);
         fade_in.gain.exponentialRampToValueAtTime(1, now + FADE_IN_DURATION);
@@ -103,31 +146,32 @@ require_interaction.onclick = () => {
             const next_hour = (clock.current_hour() + 1) % 24;
 
             const next_hour_song = await hour_song_builders[next_hour]();
+            const next_hour_background = await backgrounds_loaders[next_hour]();
 
             next_hour_song.schedule_play(
                 (rhythm.current_time + (clock.to_next_hour() / 1000)) as Seconds
             );
 
             gsap.to(
-                ".fader",
+                fader,
                 {
                     opacity: 1,
                     duration: FADE_OUT_DURATION,
-                    ease: "expo",
+                    ease: "power3.out",
                     delay: (clock.to_next_hour() / 1000) - FADE_OUT_DURATION,
                     onComplete: () => {
-                        set_background(next_hour);
+                        set_background(next_hour_background);
                     }
                 }
             );
 
             gsap.to(
-                ".fader",
+                fader,
                 {
                     opacity: 0,
                     duration: hour_bells.duration,
-                    ease: "expo",
-                    delay: (clock.to_next_hour() / 1000)
+                    ease: "expo.in",
+                    delay: (clock.to_next_hour() / 1000),
                 }
             );
 
