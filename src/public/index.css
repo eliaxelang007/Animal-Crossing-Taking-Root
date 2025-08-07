@@ -1,0 +1,63 @@
+/* Fonts */
+* {
+    font-family: "Rubik Mono One", sans-serif;
+    text-align: center;
+    color: white;
+    cursor: default;
+}
+
+/* Layout */
+.fill-parent {
+    width: 100%;
+    height: 100%;
+}
+
+.img-cover {
+    object-fit: cover;
+}
+
+.stack {
+    position: relative;
+}
+
+.stack>* {
+    position: absolute;
+}
+
+.flex {
+    display: flex;
+}
+
+.flex-center-children {
+    justify-content: center;
+    align-items: center;
+}
+
+/* Visuals */
+
+.blur {
+    backdrop-filter: blur(0.7rem);
+    background-color: rgba(200, 200, 200, 0.3);
+}
+
+.center-card {
+    aspect-ratio: 16/9;
+    width: 1920px;
+    max-width: min(90%, 40rem);
+    max-height: min(90%);
+    border-radius: 2rem;
+}
+
+.center-card>h1 {
+    font-size: 2rem;
+    margin: 1rem;
+}
+
+.black-background {
+    background-color: black;
+}
+
+.fader {
+    opacity: 0;
+    /* Animated with gsap. */
+}

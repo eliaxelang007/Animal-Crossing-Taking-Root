@@ -1,6 +1,12 @@
+import { Seconds } from "rhythm.js";
+
 type NewType<T> = T & { readonly __brand: unique symbol };
 
 type Milliseconds = NewType<number>;
+
+const HOUR_SECONDS = 3600 as Seconds;
+const MINUTE_MILLISECONDS = 60000 as Milliseconds;
+const HOUR_MILLISECONDS = (HOUR_SECONDS * 1000) as Milliseconds;
 
 class Clock {
     readonly date_creation_time: Milliseconds;
@@ -22,7 +28,6 @@ class Clock {
     }
 
     epoch_to_next_hour(): Milliseconds {
-        const HOUR_MILLISECONDS = 3600000;
         return (this.epoch_to_hour_start() + HOUR_MILLISECONDS) as Milliseconds;
     }
 
@@ -39,8 +44,12 @@ class Clock {
     to_next_hour(): Milliseconds {
         return (this.epoch_to_next_hour() - this.since_epoch()) as Milliseconds;
     }
+
+    current_hour(): number {
+        return this.high_res_now().getHours();
+    }
 }
 
 const clock = new Clock();
 
-export { type Milliseconds, clock };
+export { type Milliseconds, clock, HOUR_SECONDS, HOUR_MILLISECONDS, MINUTE_MILLISECONDS };

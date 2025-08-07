@@ -1,23 +1,30 @@
 {
-  "name": "vite-template-solid",
-  "version": "0.0.0",
-  "description": "",
-  "type": "module",
+  "name": "animal_crossing_taking_root",
+  "version": "1.0.0",
+  "main": "index.js",
   "scripts": {
-    "start": "vite",
     "dev": "vite",
     "build": "vite build",
-    "serve": "vite preview"
+    "preview": "vite preview"
   },
-  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eliaxelang007/Animal-Crossing-Taking-Root.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/eliaxelang007/Animal-Crossing-Taking-Root/issues"
+  },
+  "homepage": "https://github.com/eliaxelang007/Animal-Crossing-Taking-Root#readme",
+  "description": "",
   "devDependencies": {
-    "typescript": "^5.7.2",
-    "vite": "^6.0.0",
-    "vite-plugin-solid": "^2.11.6"
+    "typescript": "^5.9.2",
+    "vite": "^7.0.6"
   },
   "dependencies": {
-    "@solidjs/router": "^0.15.3",
-    "rhythm.js": "^1.1.5",
-    "solid-js": "^1.9.5"
+    "gsap": "^3.13.0",
+    "rhythm.js": "^1.1.7"
   }
 }
