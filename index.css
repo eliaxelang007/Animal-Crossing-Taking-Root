@@ -41,7 +41,7 @@
 }
 
 .center-card {
-    aspect-ratio: 16/9;
+    aspect-ratio: 16 / 9;
     width: 1920px;
     max-width: min(90%, 40rem);
     max-height: min(90%);
