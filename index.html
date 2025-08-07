@@ -12,6 +12,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Rubik+Mono+One&display=swap" rel="stylesheet">
 
+    <!-- Preloading Backgrounds... -->
+
     <link rel="preload" href="backgrounds/0.png" as="image">
     <link rel="preload" href="backgrounds/1.png" as="image">
     <link rel="preload" href="backgrounds/2.png" as="image">
@@ -37,19 +39,22 @@
     <link rel="preload" href="backgrounds/22.png" as="image">
     <link rel="preload" href="backgrounds/23.png" as="image">
 
+    <!-- -------------------------------- -->
+
     <title>Animal Crossing Taking Root</title>
-  <script type="module" crossorigin src="/assets/index-p9V5g_N9.js"></script>
+  <script type="module" crossorigin src="/assets/index-BA-3CAVu.js"></script>
 </head>
 
 <body class="fill-parent">
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div class="fill-parent stack">
         <div class="fill-parent stack">
-            <img class="fill-parent img-cover" src="backgrounds/15.png">
+            <img id="blurred-background" class="fill-parent img-cover">
             <div class="fill-parent blur flex flex-center-children">
-                <img class="center-card" src="backgrounds/15.png"></img>
+                <img id="center-card" class="center-card"></img>
             </div>
         </div>
+        <div class="fill-parent black-background fader"></div>
         <div id="require-interaction" class="fill-parent blur flex flex-center-children">
             <div class="black-background center-card flex flex-center-children">
                 <h1>Click here to start playing music!</h1>
