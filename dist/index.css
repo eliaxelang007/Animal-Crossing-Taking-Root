@@ -56,3 +56,8 @@
 .black-background {
     background-color: black;
 }
+
+.fader {
+    opacity: 0;
+    /* Animated with gsap. */
+}
