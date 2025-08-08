@@ -99,6 +99,25 @@ require_interaction.onclick = () => {
     const FADE_IN_DURATION = 3 as Seconds;
 
     (async () => {
+        const timer = document.getElementById("timer")! as HTMLHeadingElement;
+
+        while (true) {
+            const now = Clock.high_res_now();
+            const pad_time = (time: number) => time.toString().padStart(2, "0");
+
+            let hours = now.getHours();
+
+            const am_pm = (hours < 12) ? "AM" : "PM";
+
+            hours %= 12;
+            hours = (hours === 0) ? 12 : hours;
+
+            timer.textContent = `${pad_time(hours)}:${pad_time(now.getMinutes())}:${pad_time(now.getSeconds())} ${am_pm}`;
+            await delay(Clock.to_next_second());
+        }
+    })();
+
+    (async () => {
         if (Clock.to_next_hour_s() <= FADE_IN_DURATION) {
             load_song(Clock.next_hour()); // This is intentionally not [await]ed. We're just preloading here. 
 

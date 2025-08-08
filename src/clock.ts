@@ -6,7 +6,8 @@ type Milliseconds = NewType<number>;
 
 const HOUR_S = 3600 as Seconds;
 const MINUTE_MS = 60000 as Milliseconds;
-const HOUR_MS = (HOUR_S * 1000) as Milliseconds;
+const SECOND_MS = 1000 as Milliseconds;
+const HOUR_MS = (HOUR_S * SECOND_MS) as Milliseconds;
 
 class Clock {
     static date_creation_time = Date.now() as Milliseconds;
@@ -22,8 +23,18 @@ class Clock {
         return high_res_now.getTime() as Milliseconds;
     }
 
+    static epoch_to_second_start(): Milliseconds {
+        const high_res_now = this.high_res_now();
+        high_res_now.setMilliseconds(0);
+        return high_res_now.getTime() as Milliseconds;
+    }
+
     static epoch_to_next_hour(): Milliseconds {
         return (this.epoch_to_hour_start() + HOUR_MS) as Milliseconds;
+    }
+
+    static epoch_to_next_second(): Milliseconds {
+        return (this.epoch_to_second_start() + SECOND_MS) as Milliseconds;
     }
 
     static since_epoch(): Milliseconds {
@@ -38,6 +49,10 @@ class Clock {
 
     static to_next_hour(): Milliseconds {
         return (this.epoch_to_next_hour() - this.since_epoch()) as Milliseconds;
+    }
+
+    static to_next_second(): Milliseconds {
+        return (this.epoch_to_next_second() - this.since_epoch()) as Milliseconds;
     }
 
     static to_next_hour_s(): Seconds {
