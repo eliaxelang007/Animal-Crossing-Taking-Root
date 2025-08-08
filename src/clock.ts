@@ -4,52 +4,61 @@ type NewType<T> = T & { readonly __brand: unique symbol };
 
 type Milliseconds = NewType<number>;
 
-const HOUR_SECONDS = 3600 as Seconds;
-const MINUTE_MILLISECONDS = 60000 as Milliseconds;
-const HOUR_MILLISECONDS = (HOUR_SECONDS * 1000) as Milliseconds;
+const HOUR_S = 3600 as Seconds;
+const MINUTE_MS = 60000 as Milliseconds;
+const HOUR_MS = (HOUR_S * 1000) as Milliseconds;
 
 class Clock {
-    readonly date_creation_time: Milliseconds;
-    readonly performance_creation_time: Milliseconds;
+    static date_creation_time = Date.now() as Milliseconds;
+    static performance_creation_time = performance.now() as Milliseconds;
 
-    constructor() {
-        this.date_creation_time = Date.now() as Milliseconds;
-        this.performance_creation_time = performance.now() as Milliseconds;
-    }
-
-    high_res_now(): Date {
+    static high_res_now(): Date {
         return new Date(this.since_epoch());
     }
 
-    epoch_to_hour_start(): Milliseconds {
+    static epoch_to_hour_start(): Milliseconds {
         const high_res_now = this.high_res_now();
         high_res_now.setMinutes(0, 0, 0);
         return high_res_now.getTime() as Milliseconds;
     }
 
-    epoch_to_next_hour(): Milliseconds {
-        return (this.epoch_to_hour_start() + HOUR_MILLISECONDS) as Milliseconds;
+    static epoch_to_next_hour(): Milliseconds {
+        return (this.epoch_to_hour_start() + HOUR_MS) as Milliseconds;
     }
 
-    since_epoch(): Milliseconds {
+    static since_epoch(): Milliseconds {
         return (this.date_creation_time + (
             performance.now() - this.performance_creation_time
         )) as Milliseconds;
     }
 
-    since_hour_start(): Milliseconds {
+    static since_hour_start(): Milliseconds {
         return (this.since_epoch() - this.epoch_to_hour_start()) as Milliseconds;
     }
 
-    to_next_hour(): Milliseconds {
+    static to_next_hour(): Milliseconds {
         return (this.epoch_to_next_hour() - this.since_epoch()) as Milliseconds;
     }
 
-    current_hour(): number {
+    static to_next_hour_s(): Seconds {
+        return this.to_s(this.to_next_hour());
+    }
+
+    static current_hour(): number {
         return this.high_res_now().getHours();
+    }
+
+    static next_hour(): number {
+        return (this.current_hour() + 1) % 24;
+    }
+
+    static to_ms(seconds: Seconds): Milliseconds {
+        return (seconds * 1000) as Milliseconds;
+    }
+
+    static to_s(milliseconds: Milliseconds): Seconds {
+        return (milliseconds / 1000) as Seconds;
     }
 }
 
-const clock = new Clock();
-
-export { type Milliseconds, clock, HOUR_SECONDS, HOUR_MILLISECONDS, MINUTE_MILLISECONDS };
+export { type Milliseconds, Clock, HOUR_S, HOUR_MS, MINUTE_MS };
